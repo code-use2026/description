@@ -1,0 +1,152 @@
+"use strict";
+
+function noticeItem(n, showActions = false) {
+  return `<div class="notice-item" data-action="notice-view" data-id="${n.id}" role="button" tabindex="0"><span class="notice-icon">${icon(n.type === "赛事通知" ? "award" : n.type === "活动公告" ? "calendar" : "megaphone")}</span><div class="notice-content"><div class="notice-title">${esc(n.t)}</div><div class="tag-row" style="margin-top:5px">${badge(n.type, n.type === "活动公告" ? "violet" : n.type === "赛事通知" ? "orange" : "blue")}${statusBadge(n.status)}</div><div class="notice-summary">${esc(n.s)}</div></div><span class="notice-date">${n.d}</span>${showActions ? `<div class="cell-actions"><button class="action-link" data-action="notice-edit" data-id="${n.id}">编辑</button><button class="action-link danger" data-action="notice-delete" data-id="${n.id}">删除</button></div>` : ""}</div>`;
+}
+function todoReminder(t) {
+  return `<div class="todo-reminder" data-action="todo-view" data-id="${t.id}" role="button" tabindex="0"><div class="todo-reminder-head"><span>${esc(t.t)}</span>${statusBadge(t.st)}</div><div class="todo-reminder-meta">${icon("clock", "icon-sm")}截止 ${t.ddl}</div></div>`;
+}
+function alertItem(a) {
+  return `<div class="alert-item" data-action="alert-view" data-id="${a.id}" role="button" tabindex="0">${badge(`${a.lv}风险`, a.lv === "高" ? "red" : a.lv === "中" ? "orange" : "blue")}<div class="alert-body"><div class="alert-title">${a.t}</div><div class="alert-meta">${a.area} · ${a.time.slice(5, 16)}</div></div>${icon("chevronRight", "icon-sm")}</div>`;
+}
+function deviceRows() {
+  return DEVICES.map(device => { const pct = Math.round(device.on / device.total * 100); return `<div class="device-row"><span>${device.n}</span><div class="progress ${pct >= 95 ? "green" : pct < 85 ? "orange" : ""}"><span style="width:${pct}%"></span></div><span class="muted">${device.on}/${device.total}</span></div>`; }).join("");
+}
+
+PAGES.boardLegacy = () => {
+  const range = state.boardRange, days = USG.days;
+  const selected = range === "今日" ? days.slice(-1) : range === "本周" ? days.slice(-7) : days.slice(-14);
+  const energy = sum(selected, "elec") + sum(selected, "water") + sum(selected, "pub");
+  const online = sum(DEVICES, "on"), allDevices = sum(DEVICES, "total"), onlineRate = (online / allDevices * 100).toFixed(1);
+  const areaRows = USG_AREAS.map((area, index) => {
+    const arr = USG.areas[area].filter(item => item.month === 10), electricity = sum(arr, "elec"), water = sum(arr, "water");
+    return { area, electricity, water, amount: (electricity / .55 / 10000).toFixed(1), tons: Math.round(water / 2.8), trend: ["+3.2", "+1.8", "-2.1", "+4.6"][index] };
+  });
+  return `${pageHeader(`<button class="btn" data-action="board-export">${icon("download")}导出简报</button><button class="btn primary" data-action="go" data-page="usage">查看用量明细${icon("arrowRight")}</button>`, "CAMPUS OVERVIEW")}
+    <div class="toolbar"><div class="data-pill">${icon("activity", "icon-sm")}校园运行态势</div>${filterTabs("boardRange", ["今日", "本周", "本月", "本学期"], range)}<span class="toolbar-spacer"></span><span class="result-count">数据更新于 ${state.lastSync}</span></div>
+    <div class="grid stats-grid">${statCard("zap", `${(energy / 10000).toFixed(1)} 万`, "全校总能耗费用", "水电与公共能耗 · 较上周期 +6.6%", "blue")}${statCard("cart", `${(sum(selected, "canteen") / 10000).toFixed(1)} 万`, "食堂总营收", "较上周期 +2.8%", "green")}${statCard("alert", `${USG_ALERTS.length} 条`, "水电异常告警", "高风险 1 条 · 中风险 2 条", "orange")}${statCard("activity", `<span data-live="online-rate">${onlineRate}%</span>`, "设备综合在线率", `<span data-live="online-count">${online} / ${allDevices} 台在线</span>`, "violet")}</div>
+    <div class="layout-2-1"><div class="stack"><section class="card">${chartHeader("每日能耗统计", "食堂营收与水电能耗联动 · 按住 Shift 滚轮缩放 · 单位：元", "board-energy")}<div class="chart tall" id="board-energy"></div></section><section class="card">${cardHeader("各片区用电用水对比", "2026 年 10 月 · 点击行进入对应片区明细", `<button class="btn small" data-action="area-export">${icon("download", "icon-sm")}导出</button>`)}<div class="table-scroll"><table><thead><tr><th>片区</th><th>用电量（万度）</th><th>用电费用</th><th>用水量（吨）</th><th>环比</th></tr></thead><tbody>${areaRows.map(row => `<tr data-action="usage-area" data-id="${row.area}" style="cursor:pointer"><td class="cell-title">${row.area}</td><td>${row.amount}</td><td>¥${formatNumber(row.electricity)}</td><td>${formatNumber(row.tons)}</td><td class="${row.trend.startsWith("-") ? "text-success" : "text-warning"}">${row.trend}%</td></tr>`).join("")}</tbody></table></div></section></div>
+    <div class="stack"><section class="card">${chartHeader("经费占比", "本年度已执行经费结构", "board-finance")}<div class="chart short" id="board-finance"></div></section><section class="card">${chartHeader("月度能耗趋势", "近 6 个月水电及公共能耗 · 单位：万元", "board-month")}<div class="chart short" id="board-month"></div></section><section class="card">${cardHeader("异常告警", "按风险等级优先处置", badge(`${USG_ALERTS.length} 条`, "red"))}${USG_ALERTS.map(alertItem).join("")}</section><section class="card">${cardHeader("设备状态", `全校 ${allDevices} 台监测与结算设备`, `<span class="data-pill">离线 ${allDevices - online} 台</span>`)}${deviceRows()}<div class="item-footer mt-16"><button class="btn small" data-action="go" data-page="repair">${icon("wrench", "icon-sm")}报修管理</button><button class="btn small soft" data-action="device-inspect">${icon("send", "icon-sm")}离线设备巡检</button></div></section></div></div>`;
+};
+PAGES.board = () => {
+  const range = state.boardRange, days = USG.days;
+  const selected = range === "今日" ? days.slice(-1) : range === "本周" ? days.slice(-7) : days.slice(-14);
+  const energy = sum(selected, "elec") + sum(selected, "water") + sum(selected, "pub");
+  const online = sum(DEVICES, "on"), allDevices = sum(DEVICES, "total"), onlineRate = (online / allDevices * 100).toFixed(1);
+  const areaRows = USG_AREAS.map((area, index) => {
+    const arr = USG.areas[area].filter(item => item.month === 10), electricity = sum(arr, "elec"), water = sum(arr, "water");
+    return { area, electricity, water, amount: (electricity / .55 / 10000).toFixed(1), tons: Math.round(water / 2.8), trend: ["+3.2", "+1.8", "-2.1", "+4.6"][index] };
+  });
+  const areaTable = `<section class="card">${cardHeader("各片区用电用水对比", "2026 年 10 月 · 点击行进入对应片区明细", `<button class="btn small" data-action="area-export">${icon("download", "icon-sm")}导出</button>`)}<div class="table-scroll"><table><thead><tr><th>片区</th><th>用电量（万度）</th><th>用电费用</th><th>用水量（吨）</th><th>环比</th></tr></thead><tbody>${areaRows.map(row => `<tr data-action="usage-area" data-id="${row.area}" style="cursor:pointer"><td class="cell-title">${row.area}</td><td>${row.amount}</td><td>¥${formatNumber(row.electricity)}</td><td>${formatNumber(row.tons)}</td><td class="${row.trend.startsWith("-") ? "text-success" : "text-warning"}">${row.trend}%</td></tr>`).join("")}</tbody></table></div></section>`;
+  const alerts = `<section class="card">${cardHeader("异常告警", "按风险等级优先处置", badge(`${USG_ALERTS.length} 条`, "red"))}${USG_ALERTS.map(alertItem).join("")}<button class="btn soft" style="width:100%;margin-top:12px" data-action="go" data-page="usage">查看全部告警${icon("arrowRight", "icon-sm")}</button></section>`;
+  const devices = `<section class="card">${cardHeader("设备状态", `全校 ${allDevices} 台监测与结算设备`, `<span class="data-pill">离线 ${allDevices - online} 台</span>`)}${deviceRows()}<div class="item-footer mt-16"><button class="btn small" data-action="go" data-page="repair">${icon("wrench", "icon-sm")}报修管理</button><button class="btn small soft" data-action="device-inspect">${icon("send", "icon-sm")}离线设备巡检</button></div></section>`;
+  return `${pageHeader(`<button class="btn" data-action="board-export">${icon("download")}导出简报</button><button class="btn primary" data-action="go" data-page="usage">查看用量明细${icon("arrowRight")}</button>`, "CAMPUS OVERVIEW")}
+    <div class="toolbar"><div class="data-pill">${icon("activity", "icon-sm")}校园运行态势</div>${filterTabs("boardRange", ["今日", "本周", "本月", "本学期"], range)}<span class="toolbar-spacer"></span><span class="result-count">数据更新于 ${state.lastSync}</span></div>
+    <div class="grid stats-grid">${statCard("zap", `${(energy / 10000).toFixed(1)} 万`, "全校总能耗费用", "水电与公共能耗 · 较上周期 +6.6%", "blue")}${statCard("cart", `${(sum(selected, "canteen") / 10000).toFixed(1)} 万`, "食堂总营收", "较上周期 +2.8%", "green")}${statCard("alert", `${USG_ALERTS.length} 条`, "水电异常告警", "高风险 1 条 · 中风险 2 条", "orange")}${statCard("activity", `<span data-live="online-rate">${onlineRate}%</span>`, "设备综合在线率", `<span data-live="online-count">${online} / ${allDevices} 台在线</span>`, "violet")}</div>
+    <div class="layout-2-1 mb-16"><section class="card">${chartHeader("每日能耗统计", "食堂营收与水电能耗联动 · 按住 Shift 滚轮缩放 · 单位：元", "board-energy")}<div class="chart tall" id="board-energy"></div></section><div class="stack"><section class="card">${chartHeader("经费占比", "本年度已执行经费结构", "board-finance")}<div class="chart short" id="board-finance"></div></section><section class="card">${chartHeader("月度能耗趋势", "近 6 个月水电及公共能耗 · 单位：万元", "board-month")}<div class="chart short" id="board-month"></div></section></div></div>
+    <div class="grid grid-3">${areaTable}${alerts}${devices}</div>`;
+};
+CHART_RENDERERS.board = () => {
+  const range = state.boardRange, days = USG.days;
+  if (range === "本学期") {
+    axisChart("board-energy", USG.months.map(m => m[0]), [{ name: "食堂营收", data: USG.months.map(m => m[1] * 6100), color: "#6b9fc7" }, { name: "宿舍电费", data: USG.months.map(m => m[1] * 1750), color: "#8ab6d2" }, { name: "宿舍水费", data: USG.months.map(m => m[1] * 720), color: "#78ae98" }], "bar");
+  } else {
+    const selected = range === "今日" ? days.slice(-1) : range === "本周" ? days.slice(-7) : days.slice(-14);
+    axisChart("board-energy", selected.map(d => d.date), [{ name: "食堂营收", data: selected.map(d => d.canteen), color: "#6b9fc7" }, { name: "宿舍电费", data: selected.map(d => d.elec), color: "#8ab6d2" }, { name: "宿舍水费", data: selected.map(d => d.water), color: "#78ae98" }], "bar");
+  }
+  const total = sum(FIN.cats, "u");
+  donutChart("board-finance", FIN.cats.map(c => ({ n: c.n, v: c.u, c: c.c })), "已执行经费", `${total} 万`);
+  axisChart("board-month", USG.months.map(m => m[0]), [{ name: "能耗费用", data: USG.months.map(m => m[1]), color: "#6b9fc7", area: true }], "line", { zoom: false, unit: "万元" });
+};
+
+PAGES.workbench = () => {
+  const hour = new Date().getHours(), greeting = hour < 11 ? "早上好" : hour < 14 ? "中午好" : hour < 18 ? "下午好" : "晚上好";
+  return `<section class="hero-banner"><div class="hero-copy"><div class="eyebrow">${icon("school", "icon-sm")}CAMPUS WORKSPACE</div><h1 class="hero-title" data-page-title="工作台">${greeting}，管理员</h1><p class="hero-desc">今天是 2026 年 11 月 4 日 星期三 · 平台共有 17 个功能模块，校园核心数据运行正常。<br>这里汇总了您需要关注的公告、待办和常用业务入口。</p></div><svg class="hero-illustration" viewBox="0 0 160 90" fill="none" aria-hidden="true"><path d="M4 76c25-6 30-43 51-43 18 0 21 25 36 25 19 0 25-49 44-49 14 0 17 30 25 37" stroke="currentColor" stroke-width="1.5"/><path d="M47 48h66v29H47z" fill="rgba(255,255,255,.65)" stroke="currentColor"/><path d="m41 49 39-23 39 23H41Z" fill="rgba(141,179,204,.18)" stroke="currentColor"/><path d="M60 56v16m13-16v16m13-16v16m13-16v16" stroke="currentColor"/><circle cx="132" cy="25" r="13" stroke="currentColor"/><path d="m132 12 4 9 9 4-9 4-4 9-4-9-9-4 9-4 4-9Z" fill="rgba(141,179,204,.18)" stroke="currentColor"/></svg><button class="btn primary" data-action="go" data-page="datamgr">进入数据管理${icon("arrowRight")}</button></section>
+    <div class="grid stats-grid">${statCard("users", formatNumber(DATA.stats.students), "在校总人数", "男生 52% · 女生 48%", "blue")}${statCard("award", DATA.stats.clubs, "学生社团数量", "本学年新增 4 个", "violet")}${statCard("building", DATA.stats.projects, "在研校园项目", "竞赛项目 6 个", "green")}${statCard("message", DATA.stats.feedbacks, "意见建议总数", `待处理 ${DATA.feedbacks.filter(f => f.st === "待处理").length} 条`, "red")}</div>
+    <div class="layout-2-1"><div class="stack"><section class="card">${cardHeader("常用功能入口", "高频业务一键直达")}<div class="quick-grid">${[["megaphone", "发布公告", "notice"], ["check", "新增待办", "todo"], ["message", "处理反馈", "feedback"], ["exchange", "新建交接单", "handover"], ["folder", "查询档案", "archive"], ["chart", "数据看板", "dashboard"]].map(q => `<div class="quick-entry" data-action="go" data-page="${q[2]}" role="button" tabindex="0"><span class="stat-icon">${icon(q[0])}</span><strong>${q[1]}</strong>${icon("chevronRight", "icon-sm")}</div>`).join("")}</div></section><section class="card">${cardHeader("最新公告", "校园通知、活动与赛事信息", `<button class="btn small" data-action="go" data-page="notice">全部公告${icon("arrowRight", "icon-sm")}</button>`)}<div class="notice-list">${DATA.notices.slice(0, 4).map(n => noticeItem(n)).join("")}</div></section></div><div class="stack"><section class="card">${cardHeader("待办提醒", "按截止时间优先处理", badge(`${DATA.todos.filter(t => t.st !== "已完成").length} 项待办`, "orange"))}${DATA.todos.filter(t => t.st !== "已完成").slice(0, 5).map(todoReminder).join("")}<button class="btn soft" style="width:100%;margin-top:12px" data-action="go" data-page="todo">查看全部待办${icon("arrowRight", "icon-sm")}</button></section><section class="card">${cardHeader("本周数据动态", "核心业务变化概览")}${progressItem("档案数字化完成率", 76, "")}${progressItem("反馈按时办结率", 84, "green")}${progressItem("项目里程碑达成率", 68, "")}${progressItem("数据系统对接率", 45, "orange")}</section></div></div>`;
+};
+
+PAGES.dashboard = () => {
+  const filters = filtersFor(), category = filters.category || "全部", kw = filters.kw || "";
+  const stats = [
+    { label: "在校学生", value: formatNumber(DATA.stats.students), sub: "较上月 +126", icon: "users", tone: "blue", cat: "学生数据" },
+    { label: "社团总数", value: DATA.stats.clubs, sub: "活跃度 62%", icon: "award", tone: "violet", cat: "学生数据" },
+    { label: "在研项目", value: DATA.stats.projects, sub: "本月新增 2 个", icon: "building", tone: "green", cat: "教学数据" },
+    { label: "意见建议", value: DATA.stats.feedbacks, sub: "办结率 84%", icon: "message", tone: "red", cat: "后勤数据" }
+  ].filter(item => (category === "全部" || item.cat === category) && (!kw || item.label.includes(kw)));
+  const panels = [
+    { t: "档案数字化建设", p: 76, items: ["学籍档案入库", "社团信息同步", "历史档案扫描", "声像档案整理"], cat: "教学数据" },
+    { t: "项目过程管理", p: 68, items: ["立项审批", "中期检查", "经费执行", "结题验收"], cat: "教学数据" },
+    { t: "反馈闭环处理", p: 84, items: ["分类派发", "限时办结", "满意度回访"], cat: "后勤数据" },
+    { t: "数据对接进度", p: 45, items: ["教务系统", "一卡通", "图书借阅", "门禁物联"], cat: "学生数据" }
+  ].filter(item => (category === "全部" || item.cat === category) && (!kw || item.t.includes(kw) || item.items.some(v => v.includes(kw))));
+  return `${pageHeader(`<button class="btn" data-action="dashboard-export">${icon("download")}导出指标</button><button class="btn primary" data-action="refresh">${icon("refresh")}刷新看板</button>`, "DATA ANALYSIS")}
+    <div class="toolbar">${searchControl("kw", "搜索看板指标 / 数据项", kw)}${filterTabs("category", ["全部", "教学数据", "学生数据", "后勤数据"], category)}<span class="toolbar-spacer"></span><button class="btn small" data-action="reset-filters">${icon("reset", "icon-sm")}重置</button></div>
+    ${stats.length ? `<div class="grid stats-grid">${stats.map(item => statCard(item.icon, item.value, item.label, item.sub, item.tone)).join("")}</div>` : ""}
+    ${panels.length ? `<div class="grid grid-4 mb-16">${panels.map(panel => `<section class="card">${cardHeader(panel.t, panel.cat, `<strong style="color:var(--primary)">${panel.p}%</strong>`)}<div class="progress mb-16"><span style="width:${panel.p}%"></span></div>${panel.items.map((item, index) => `<div class="info-row" style="padding:6px 0"><span class="${index < Math.round(panel.items.length * panel.p / 100) ? "text-success" : "muted"}">${icon(index < Math.round(panel.items.length * panel.p / 100) ? "checkCircle" : "clock", "icon-sm")}</span><span class="info-value" style="font-size:10px">${item}</span></div>`).join("")}</section>`).join("")}</div>` : ""}
+    ${!stats.length && !panels.length && kw ? emptyState() : `<div class="layout-2-1"><div class="stack"><section class="card">${chartHeader("近 6 个月意见反馈量", "反馈受理数量变化趋势 · 单位：条", "dashboard-feedback")}<div class="chart" id="dashboard-feedback"></div></section><section class="card">${chartHeader("近 6 个月新增校园档案", "按归档月份统计 · 单位：卷", "dashboard-archive")}<div class="chart" id="dashboard-archive"></div></section></div><div class="stack"><section class="card">${chartHeader("档案库结构", "档案分类占比", "dashboard-donut")}<div class="chart" id="dashboard-donut"></div></section><section class="card">${cardHeader("各院系数据覆盖", "已接入数据记录量", `<button class="btn small" data-action="dashboard-export">导出</button>`)}${[{ n: "计算机学院", v: 46 }, { n: "经济管理学院", v: 38 }, { n: "工学院", v: 31 }, { n: "文学院", v: 24 }, { n: "理学院", v: 19 }, { n: "外国语学院", v: 14 }].map(item => `<div class="progress-item"><div class="progress-head"><span>${item.n}</span><span>${item.v} 条</span></div><div class="progress"><span style="width:${item.v / 46 * 100}%"></span></div></div>`).join("")}</section></div></div>`}`;
+};
+CHART_RENDERERS.dashboard = () => {
+  if (!document.getElementById("dashboard-feedback")) return;
+  axisChart("dashboard-feedback", ["6月", "7月", "8月", "9月", "10月", "11月"], [{ name: "反馈量", data: [62, 75, 88, 96, 110, 128], color: "#6b9fc7", area: true }], "line", { zoom: false });
+  axisChart("dashboard-archive", ["6月", "7月", "8月", "9月", "10月", "11月"], [{ name: "新增档案", data: [4, 6, 5, 8, 7, 9], color: "#8ab6d2" }], "bar", { zoom: false });
+  donutChart("dashboard-donut", [{ n: "学籍档案", v: 9, c: "#6b9fc7" }, { n: "健康档案", v: 7, c: "#8ab6d2" }, { n: "资助档案", v: 5, c: "#9b96bb" }, { n: "其他档案", v: 3, c: "#78ae98" }], "总档案", "24 卷");
+};
+
+PAGES.usage = () => {
+  const month = state.usageMonth, monthDays = USG.days.filter(d => d.month === month), areaKey = state.usageArea === "全部片区" ? null : state.usageArea;
+  const energy = sum(monthDays, "elec") + sum(monthDays, "water") + sum(monthDays, "pub"), consume = sum(monthDays, "canteen") + sum(monthDays, "mart"), budget = USG.budget[month], budgetPct = Math.round(energy / budget * 100);
+  const alerts = USG_ALERTS.filter(a => !areaKey || a.area === areaKey), last7 = USG.days.slice(-7);
+  const heatSlots = ["00-04", "04-08", "08-12", "12-16", "16-20", "20-24"], heatBase = [22, 31, 78, 69, 86, 54], heatDays = last7.map(d => d.date);
+  const heat = `<div class="heatmap" style="grid-template-columns:48px repeat(7,1fr)"><div></div>${heatDays.map(d => `<div class="heat-label" style="justify-content:center">${d}</div>`).join("")}${heatSlots.map((slot, row) => `<div class="heat-label">${slot}</div>${heatDays.map((day, col) => { const value = Math.round(heatBase[row] + ((row * 13 + col * 7) % 22)); const alpha = .12 + value / 120 * .65; return `<div class="heat-cell" title="${day} ${slot} 公共能耗 ${value * 10} kWh" style="color:${value > 65 ? "#fff" : "#587386"};background:rgba(107,159,199,${alpha})">${value}</div>`; }).join("")}`).join("")}</div>`;
+  return `${pageHeader(`<button class="btn" data-action="usage-export">${icon("download")}导出统计报表</button><button class="btn primary" data-action="go" data-page="repair">${icon("wrench")}新建报修</button>`, "ENERGY & CONSUMPTION")}
+    <div class="toolbar"><select class="select-control" data-usage="area" aria-label="选择片区">${["全部片区", ...USG_AREAS].map(a => `<option ${a === state.usageArea ? "selected" : ""}>${a}</option>`).join("")}</select><select class="select-control" data-usage="month" aria-label="选择月份">${[10, 11].map(m => `<option value="${m}" ${m === month ? "selected" : ""}>2026 年 ${m} 月</option>`).join("")}</select><span class="data-pill">${icon("shield", "icon-sm")}仅片区 / 全校宏观汇总，不含个人信息</span><span class="toolbar-spacer"></span><button class="btn small" data-action="usage-reset">${icon("reset", "icon-sm")}重置筛选</button></div>
+    <div class="grid stats-grid">${statCard("zap", `${(energy / 10000).toFixed(1)} 万`, `${month} 月能耗费用`, "环比 +6.6% · 同比 +15.2%", "blue")}${statCard("cart", `${(consume / 10000).toFixed(1)} 万`, `${month} 月消费总额`, `食堂 ${(sum(monthDays, "canteen") / 10000).toFixed(1)} 万 · 商超 ${(sum(monthDays, "mart") / 10000).toFixed(1)} 万`, "violet")}${statCard("wallet", `${budgetPct}%`, `${month} 月预算消耗进度`, `预算 ${(budget / 10000).toFixed(0)} 万元 · ${budgetPct > 100 ? "已超支" : "进度正常"}`, budgetPct > 100 ? "red" : "green")}${statCard("alert", alerts.length, "当前范围异常告警", areaKey || "全校四个宿舍片区", "orange")}</div>
+    <section class="card mb-16">${chartHeader("校方多类目每日统计", "食堂 / 水电 / 公共能耗 / 商超 · 近 7 天 · 单位：元", "usage-daily")}<div class="chart tall" id="usage-daily"></div></section>
+    <div class="layout-1-1 mb-16"><section class="card">${chartHeader("月度片区对比", `${month} 月各宿舍片区用电与用水费用`, "usage-area")}<div class="chart" id="usage-area"></div></section><section class="card">${chartHeader("经费支出占比", `${month} 月后勤经费结构`, "usage-expense")}<div class="chart" id="usage-expense"></div></section></div>
+    <div class="layout-1-1 mb-16"><section class="card">${chartHeader("能耗费用趋势", "近 6 个月 · 单位：万元", "usage-trend")}<div class="chart" id="usage-trend"></div></section><section class="card">${cardHeader("公共能耗时段热力图", "近 7 天 · 颜色越深能耗越高 · 单位：十 kWh")}${heat}</section></div>
+    <section class="card mb-16">${chartHeader(`能耗 × 运动活跃度联动分析`, `近 14 天 · ${state.usageArea} · 手环数据仅做片区聚合`, "usage-dual")}<div class="chart" id="usage-dual"></div></section>
+    <section class="card mb-16">${cardHeader("异常告警面板", "识别规则：超片区均值 25% 或超阈值即触发", badge(`${alerts.length} 条`, "red"))}${alerts.length ? alerts.map(a => `<div class="alert-item">${badge(`${a.lv}风险`, a.lv === "高" ? "red" : a.lv === "中" ? "orange" : "blue")}<div class="alert-body" data-action="alert-view" data-id="${a.id}" style="cursor:pointer"><div class="alert-title">${a.t} ${badge(a.area, "gray")}</div><div class="alert-meta">${a.d}</div></div><span class="notice-date">${a.time}</span><button class="btn small" data-action="alert-dispatch" data-id="${a.id}">${icon("send", "icon-sm")}派单</button></div>`).join("") : emptyState("该片区暂无异常告警", "当前能耗数据处于正常范围。", false)}</section>
+    <section class="card">${cardHeader("校园后勤能耗与消费监管平台架构", "四层架构：数据采集 → 中台存储 → 统计分析 → 监管可视化")}<div class="architecture">${[["数据采集层", ["食堂营收数据", "智能水表水卡数据", "智能电表能耗数据", "商超交易数据", "后勤采购台账", "蓝牙传感运动数据（批量汇总）", "公共能耗监测设备"]], ["数据中台存储层", ["时序数据库", "业务数据库", "统一汇聚原始数据"]], ["统计分析计算层", ["按日 / 按月聚合", "片区汇总", "环比同比计算", "预算统计", "能耗异常识别", "多维度联动分析"]], ["校方监管可视化层", ["每日分组条形图", "月度条形图", "经费占比饼图", "趋势折线图", "片区对比图", "时段热力图", "异常告警面板"]]].map((layer, index, array) => `<div class="arch-layer"><div class="arch-title">${layer[0]}</div><div class="arch-items">${layer[1].map(item => `<span class="arch-item">${item}</span>`).join("")}</div></div>${index < array.length - 1 ? `<span class="arch-arrow">${icon("chevronDown")}</span>` : ""}`).join("")}</div></section>`;
+};
+CHART_RENDERERS.usage = () => {
+  const last7 = USG.days.slice(-7), month = state.usageMonth, last14 = USG.days.slice(-14);
+  axisChart("usage-daily", last7.map(d => d.date), [{ name: "食堂营收", data: last7.map(d => d.canteen), color: "#6b9fc7" }, { name: "宿舍电费", data: last7.map(d => d.elec), color: "#8ab6d2" }, { name: "宿舍水费", data: last7.map(d => d.water), color: "#a9c9dd" }, { name: "公共能耗", data: last7.map(d => d.pub), color: "#9b96bb" }, { name: "商超营收", data: last7.map(d => d.mart), color: "#78ae98" }], "bar", { barMaxWidth: 16 });
+  axisChart("usage-area", USG_AREAS, [{ name: "用电", data: USG_AREAS.map(a => sum(USG.areas[a].filter(d => d.month === month), "elec")), color: "#6b9fc7" }, { name: "用水", data: USG_AREAS.map(a => sum(USG.areas[a].filter(d => d.month === month), "water")), color: "#91c1c5" }], "bar", { zoom: false });
+  donutChart("usage-expense", USG.expense, "经费占比", "100%");
+  axisChart("usage-trend", USG.months.map(m => m[0]), [{ name: "能耗费用", data: USG.months.map(m => m[1]), color: "#6b9fc7", area: true }], "line", { zoom: false, unit: "万元" });
+  const areaKey = state.usageArea === "全部片区" ? null : state.usageArea;
+  const bars = last14.map((d, i) => areaKey ? USG.areas[areaKey].slice(-14)[i].elec + USG.areas[areaKey].slice(-14)[i].water : USG_AREAS.reduce((s, area) => { const row = USG.areas[area].slice(-14)[i]; return s + row.elec + row.water; }, 0));
+  const line = last14.map((d, i) => areaKey ? USG.areas[areaKey].slice(-14)[i].sport : Math.round(USG_AREAS.reduce((s, area) => s + USG.areas[area].slice(-14)[i].sport, 0) / USG_AREAS.length));
+  const option = baseChartOption(); option.legend = { top: 0, right: 0, textStyle: { fontSize: 10, color: "#718797" } };
+  option.xAxis = { type: "category", data: last14.map(d => d.date), axisTick: { show: false }, axisLine: { lineStyle: { color: "#e2ebf0" } }, axisLabel: { fontSize: 9, color: "#8a9aa8", interval: 1 } };
+  option.yAxis = [{ type: "value", name: "能耗金额（元）", splitLine: { lineStyle: { color: "#edf2f5", type: "dashed" } }, axisLabel: { fontSize: 9 } }, { type: "value", name: "活跃度", max: 100, splitLine: { show: false }, axisLabel: { fontSize: 9 } }];
+  option.series = [{ name: "能耗金额", type: "bar", data: bars, barMaxWidth: 20, itemStyle: { color: "#83afcd", borderRadius: [5, 5, 1, 1] } }, { name: "运动活跃度", type: "line", yAxisIndex: 1, data: line, smooth: .35, symbolSize: 6, lineStyle: { width: 2.5, color: "#c4a26d" }, itemStyle: { color: "#c4a26d" } }];
+  option.dataZoom = [{ type: "inside", zoomOnMouseWheel: "shift" }, { type: "slider", height: 14, bottom: 2, borderColor: "transparent", fillerColor: "rgba(107,159,199,.15)" }]; makeChart("usage-dual", option);
+};
+
+PAGES.finance = () => {
+  const totalBudget = sum(FIN.cats, "b"), totalUsed = sum(FIN.cats, "u"), rate = (totalUsed / totalBudget * 100).toFixed(1);
+  return `${pageHeader(`<button class="btn" data-action="finance-export">${icon("download")}导出支出明细</button><button class="btn primary" data-action="finance-detail">${icon("eye")}预算说明</button>`, "FINANCIAL OVERVIEW")}
+    <div class="grid stats-grid">${statCard("wallet", `${totalBudget} 万`, "年度预算总额", "2026 学年度", "blue")}${statCard("upload", `${totalUsed} 万`, "累计执行支出", "执行进度良好", "green")}${statCard("chart", `${rate}%`, "预算执行率", "目标区间 75% - 95%", "orange")}${statCard("calendar", "129 万", "10 月支出", "环比 +2.4% · 同比 +15.2%", "violet")}</div>
+    <div class="layout-1-1 mb-16"><section class="card">${chartHeader("财政支出分类占比", "按已执行金额统计 · 单位：万元", "finance-pie")}<div class="chart" id="finance-pie"></div></section><section class="card">${chartHeader("月度支出趋势", "近 6 个月财政支出 · 单位：万元", "finance-month")}<div class="chart" id="finance-month"></div></section></div>
+    <section class="card table-card">${cardHeader("分类预算执行明细", "预算执行率超过 90% 自动提示", `<button class="btn small" data-action="finance-export">${icon("download", "icon-sm")}导出 CSV</button>`)}<div class="table-scroll"><table><thead><tr><th>支出分类</th><th>年度预算</th><th>已执行</th><th>执行率</th><th style="min-width:180px">执行进度</th><th>状态</th><th>操作</th></tr></thead><tbody>${FIN.cats.map(c => { const r = Math.round(c.u / c.b * 100); return `<tr><td class="cell-title"><span class="legend-color" style="display:inline-block;background:${c.c};margin-right:8px"></span>${c.n}</td><td>${c.b} 万</td><td>${c.u} 万</td><td><strong>${r}%</strong></td><td><div class="progress ${r > 100 ? "red" : r > 90 ? "orange" : ""}"><span style="width:${Math.min(r, 100)}%"></span></div></td><td>${statusBadge(r > 100 ? "超支" : r > 90 ? "接近上限" : "正常")}</td><td><button class="action-link" data-action="finance-category" data-id="${c.n}">详情</button></td></tr>`; }).join("")}</tbody></table></div></section>`;
+};
+CHART_RENDERERS.finance = () => {
+  donutChart("finance-pie", FIN.cats.map(c => ({ n: c.n, v: c.u, c: c.c })), "累计支出", `${sum(FIN.cats, "u")} 万`);
+  axisChart("finance-month", FIN.monthly.map(m => m[0]), [{ name: "财政支出", data: FIN.monthly.map(m => m[1]), color: "#7faaca" }], "bar", { zoom: false, unit: "万元" });
+};
+
+PAGES.overview = () => {
+  const images = [["campus-main.svg", "主教学楼", "教学核心区"], ["campus-library.svg", "图书馆", "学习资源中心"], ["campus-stadium.svg", "体育场", "运动健康空间"], ["campus-avenue.svg", "林荫大道", "校园生态景观"], ["campus-center.svg", "大学生活动中心", "文化活动空间"], ["campus-lake.svg", "校园湖畔", "喀斯特山水意象"]];
+  return `${pageHeader(`<button class="btn" data-action="overview-export">${icon("download")}导出基础信息</button><button class="btn primary" data-action="overview-edit">${icon("edit")}维护资料</button>`, "CAMPUS PROFILE")}
+    <div class="layout-1-1 mb-16"><section class="card">${cardHeader("校园基础信息", "学校基本情况一览", badge("2026 学年", "blue"))}<div class="info-list">${[["学校名称", "示例大学（演示数据）"], ["创办年份", "1958 年"], ["占地面积", "2,180 亩"], ["在校总人数", `${formatNumber(DATA.stats.students)} 人`], ["男女比例", "男生 52% · 女生 48%"], ["院系设置", "14 个学院 · 58 个本科专业"], ["学生社团", `${DATA.stats.clubs} 个`], ["图书馆藏书", "286 万册"]].map(row => `<div class="info-row"><span class="info-key">${row[0]}</span><span class="info-value">${row[1]}</span></div>`).join("")}</div></section><section class="card">${cardHeader("各社团学生爱好参与程度", "按社团类别统计参与活跃度")}${DATA.clubs.map(c => `<div class="progress-item"><div class="progress-head"><span>${c.n}</span><span>${c.pct}%</span></div><div class="progress"><span style="width:${c.pct}%;background:${c.c}"></span></div></div>`).join("")}<div class="item-highlight mt-16">学术科技类参与度最高，体育健身类本学期增长明显。数据来自社团活动签到汇总。</div></section></div>
+    <section class="card">${cardHeader("校园实景", "以统一清新插画呈现校园空间与广西山水意象", `<button class="btn small" data-action="campus-download">${icon("download", "icon-sm")}下载风貌图集</button>`)}<div class="campus-gallery">${images.map((image, index) => `<figure class="campus-photo" data-action="campus-view" data-id="${index}" role="button" tabindex="0"><img src="assets/${image[0]}" alt="${image[1]}插画" loading="lazy"><figcaption class="campus-caption"><span>${image[1]}</span><span>${image[2]}</span></figcaption></figure>`).join("")}</div></section>`;
+};
+
+PAGES.compare = () => {
+  const kw = filtersFor().kw || "", rows = COMPARE_ROWS.filter(row => !kw || row.join("").includes(kw));
+  return `${pageHeader(`<button class="btn primary" data-action="compare-export">${icon("download")}导出对比表</button>`, "PRODUCT COMPARISON")}
+    <div class="toolbar">${searchControl("kw", "搜索对比维度或功能特点", kw)}<span class="result-count">找到 ${rows.length} 个对比维度</span><span class="toolbar-spacer"></span><button class="btn small" data-action="reset-filters">${icon("reset", "icon-sm")}重置</button></div>
+    <section class="card table-card">${rows.length ? `<div class="table-scroll"><table><thead><tr><th style="min-width:150px">对比维度</th><th>传统人工管理</th><th>Excel 台账管理</th><th class="compare-highlight">本平台（校园综合数据管理平台）</th></tr></thead><tbody>${rows.map(row => `<tr><td class="cell-title">${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td><td class="compare-highlight"><strong>${row[3]}</strong></td></tr>`).join("")}</tbody></table></div>` : emptyState()}</section>`;
+};

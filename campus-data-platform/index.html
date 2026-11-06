@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5faff">
+  <meta name="description" content="清新简约的校园综合数据管理平台，覆盖校园数据、项目、后勤与事务管理。">
+  <title>校园综合数据管理平台</title>
+  <link rel="stylesheet" href="styles.css?v=20261104-2">
+</head>
+<body>
+  <div class="regional-pattern" aria-hidden="true"></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="主导航">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" fill="none"><path d="M8 16.5 20 10l12 6.5v12L20 35 8 28.5v-12Z" stroke="currentColor" stroke-width="1.8"/><path d="m13 18 7-3.8 7 3.8v7L20 29l-7-4v-7Z" fill="currentColor" opacity=".16"/><path d="M20 14v15M13 18l7 4 7-4M13 25l7-3 7 3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="brand-copy"><strong>校园综合数据</strong><span>管理平台</span><small>CAMPUS DATA</small></div>
+        <button class="icon-btn sidebar-toggle" id="sidebarToggle" aria-label="收起侧边栏" title="收起侧边栏"></button>
+      </div>
+      <nav class="side-menu" id="sideMenu"></nav>
+      <div class="sidebar-footer">
+        <div class="system-status"><span class="status-dot"></span><span>校园数据服务正常</span></div>
+        <div class="version-row"><span>v2.0 · 演示数据</span><span>17 个模块</span></div>
+      </div>
+    </aside>
+    <div class="mobile-mask" id="mobileMask"></div>
+
+    <div class="main-shell">
+      <header class="topbar">
+        <button class="icon-btn mobile-menu" id="mobileMenu" aria-label="打开导航"></button>
+        <div class="breadcrumb" id="breadcrumb"></div>
+        <div class="top-notice"><span id="noticeIcon"></span><span>演示数据环境，可在「数据管理」导入、导出校园真实数据</span></div>
+        <div class="top-actions">
+          <div class="sync-label" id="syncLabel">数据已同步</div>
+          <button class="icon-btn" id="refreshBtn" aria-label="刷新数据" title="刷新数据"></button>
+          <button class="icon-btn" id="helpBtn" aria-label="使用帮助" title="使用帮助"></button>
+          <button class="icon-btn notification-btn" id="notificationBtn" aria-label="通知中心" title="通知中心"><span class="notification-dot"></span></button>
+          <button class="profile-btn" id="profileBtn" aria-label="账户与权限"><span class="avatar">管</span><span class="profile-copy"><strong>管理员</strong><small id="roleLabel">超级管理员</small></span><span id="profileChevron"></span></button>
+        </div>
+      </header>
+      <main class="content" id="view" aria-live="polite"></main>
+      <footer class="app-footer"><span>校园综合数据管理平台</span><span>数据安全 · 规范治理 · 智慧校园</span></footer>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="modalMask" aria-hidden="true"><section class="modal" id="modal" role="dialog" aria-modal="true"></section></div>
+  <div class="drawer-mask" id="drawerMask"></div>
+  <aside class="drawer" id="drawer" aria-label="详情面板"></aside>
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+  <script src="vendor/echarts.min.js"></script>
+  <script src="data.js?v=20261104-2"></script>
+  <script src="app.js?v=20261104-2"></script>
+  <script src="pages.js?v=20261104-2"></script>
+  <script src="pages-admin.js?v=20261104-2"></script>
+  <script src="actions.js?v=20261104-2"></script>
+</body>
+</html>
